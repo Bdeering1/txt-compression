@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::str;
 
-pub fn decompress(s: &str, _verbose: bool) -> Result<String, String> {
-    let s = s.as_bytes().to_owned();
-
+pub fn decompress(s: Vec<u8>, _verbose: bool) -> Result<String, String> {
     let alias_len = 1;
     let alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
     let header_term = '|';

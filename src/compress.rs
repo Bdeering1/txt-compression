@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-pub fn compress(s: &str, _verbose: bool) -> Result<String, String> {
-    let mut s = s.as_bytes().to_owned();
+pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
     let alias_len = 1;
 
     let mut alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];

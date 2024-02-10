@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str;
 
 mod compress;
 mod decompress;
@@ -31,7 +32,7 @@ fn main() {
     }
     let input_file = input_file.unwrap();
 
-    let input_str = match fs::read_to_string(input_file) {
+    let input = match fs::read(input_file) {
         Ok(s) => s,
         Err(e) => {
             println!("Error: {}", e);
@@ -42,7 +43,7 @@ fn main() {
     let output_str: String;
     let mut output_file = PathBuf::from(input_file.file_name().unwrap());
     if compress {
-        output_str = match compress::compress(&input_str, verbose) {
+        output_str = match compress::compress(input.clone(), verbose) {
             Ok(s) => s,
             Err(e) => {
                 println!("Compression failed: {}", e);
@@ -50,9 +51,9 @@ fn main() {
             }
         };
         output_file.set_extension(EXTENSION);
-        compress_summary(&input_str, &output_str, verbose);
+        compress_summary(str::from_utf8(&input).unwrap(), &output_str, verbose);
     } else {
-        output_str = match decompress::decompress(&input_str, verbose) {
+        output_str = match decompress::decompress(input.clone(), verbose) {
             Ok(s) => s, 
             Err(e) => {
                 println!("Decompression failed: {}", e);
@@ -60,7 +61,7 @@ fn main() {
             }
         };
         output_file.set_extension("txt");
-        decompress_summary(&input_str, &output_str, verbose);
+        decompress_summary(str::from_utf8(&input).unwrap(), &output_str, verbose);
     }
 
     match fs::write(&output_file, output_str) {

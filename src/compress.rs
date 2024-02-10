@@ -4,7 +4,7 @@ pub fn compress(s: &str, _verbose: bool) -> Result<String, String> {
     let mut s = s.as_bytes().to_owned();
     let alias_len = 1;
 
-    let mut alias_chars = vec!["¦", "§", "¨", "©", "ª", "«", "¬", "®", "¯", "¥", "¤", "£", "¢", "¡", "{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
+    let mut alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
     let header_term = '|';
     let null_char = '0';
 
@@ -57,8 +57,8 @@ pub fn compress(s: &str, _verbose: bool) -> Result<String, String> {
                 Some(seq) => Some(seq.to_owned()),
                 None => break
             };
-            compressed.push_str(&p.alias.as_ref().unwrap());
             compressed.push_str(&String::from_utf8(p.chars.to_owned()).unwrap());
+            compressed.push_str(&p.alias.as_ref().unwrap());
         }
 
         // replace all instances with alias
@@ -92,19 +92,19 @@ pub fn compress(s: &str, _verbose: bool) -> Result<String, String> {
 }
 
 fn find_patterns(s: &Vec<u8>, alias_len: usize) -> Vec<Pattern> {
-    let mut p_map = HashMap::new();
+    let mut p_map = HashMap::<Vec<u8>, usize>::new();
 
     // many windows larger than 1/3 of the input have no possible matches
     // we assume repeated sequences of size n/3 < m < n/2 are very rare
     let mut pattern_size = s.len() / 3;
     while pattern_size > alias_len {
         // println!("Pattern size: {}", pattern_size);
-        for c in s.windows(pattern_size) {
+        for seq in s.windows(pattern_size) {
             // println!("Window: {:?}", String::from_utf8(c.to_vec()).unwrap());
-            if p_map.contains_key(c) {
-                *p_map.get_mut(c).unwrap() += 1;
+            if p_map.contains_key(seq) {
+                *p_map.get_mut(seq).unwrap() += 1;
             } else {
-                p_map.insert(c.to_owned(), 1);
+                p_map.insert(seq.to_owned(), 1);
             }
         }
         pattern_size -= 1;

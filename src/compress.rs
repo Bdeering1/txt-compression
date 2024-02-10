@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 
-#[allow(unused_variables)]
-pub fn compress(s: &str) -> Result<String, String> {
-    let mut s = s.as_bytes().to_vec();
+pub fn compress(s: &str, _verbose: bool) -> Result<String, String> {
+    let mut s = s.as_bytes().to_owned();
     let alias_len = 1;
 
-    let mut alias_chars = vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "&", "*", "_", "+", "="];
+    let mut alias_chars = vec!["¦", "§", "¨", "©", "ª", "«", "¬", "®", "¯", "¥", "¤", "£", "¢", "¡", "{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
     let header_term = '|';
     let null_char = '0';
 
     let mut patterns = find_patterns(&s, alias_len);
     patterns.sort_by(|a, b| {
-        a.savings(alias_len).cmp(&b.savings(alias_len))
+        a.chars.len().cmp(&b.chars.len())
     });
     patterns.retain(|p| p.savings(alias_len) > 0);
     print_patterns(&patterns, alias_len);
@@ -39,11 +38,11 @@ pub fn compress(s: &str) -> Result<String, String> {
             ci += 1;
         }
         if p.savings(alias_len) <= 0 {
-            println!("Discarding {:?} count: {} savings: {}",
-                String::from_utf8(p.chars.to_owned()).unwrap(),
-                p.count,
-                p.savings(alias_len)
-            );
+            // println!("Discarding {:?} count: {} savings: {}",
+            //     String::from_utf8(p.chars.to_owned()).unwrap(),
+            //     p.count,
+            //     p.savings(alias_len)
+            // );
             continue;
         }
         println!("Replacing {:?} count: {} savings: {}",

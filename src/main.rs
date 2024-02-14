@@ -19,7 +19,6 @@ fn main() {
     let mut compress = true;
     let mut input_file = None;
     for arg in &args[1..] {
-        println!("arg: {}", arg);
         match arg.as_str() {
             "-d" => compress = false,
             "-v" => verbose = true,

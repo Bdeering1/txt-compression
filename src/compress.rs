@@ -5,20 +5,20 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
 
     let mut alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
     let header_term = '|';
-    let null_char = '0';
+    let null_char = '\0';
 
     let mut patterns = find_patterns(&s, alias_len);
     patterns.sort_by(|a, b| {
         a.chars.len().cmp(&b.chars.len())
     });
     patterns.retain(|p| p.savings(alias_len) > 0);
-    print_patterns(&patterns, alias_len);
+    //print_patterns(&patterns, alias_len);
 
     if patterns.len() == 0 {
         return Err("Unable to compress input.".to_string());
     }
 
-    let mut compressed = String::new();
+    let mut aliases = Vec::<AliasEntry>::new();
     let mut ci;
     loop {
         // get sequence with most savings
@@ -37,11 +37,6 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
             ci += 1;
         }
         if p.savings(alias_len) <= 0 {
-            // println!("Discarding {:?} count: {} savings: {}",
-            //     String::from_utf8(p.chars.to_owned()).unwrap(),
-            //     p.count,
-            //     p.savings(alias_len)
-            // );
             continue;
         }
         println!("Replacing {:?} count: {} savings: {}",
@@ -56,15 +51,17 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
                 Some(seq) => Some(seq.to_owned()),
                 None => break
             };
-            compressed.push_str(&String::from_utf8(p.chars.to_owned()).unwrap());
-            compressed.push_str(&p.alias.as_ref().unwrap());
+            aliases.push(AliasEntry {
+                chars: p.chars.to_owned(),
+                alias: p.alias.as_ref().unwrap().to_owned()
+            });
         }
 
         // replace all instances with alias
         ci = 0;
         while ci < s.len() {
             if ci + p.chars.len() <= s.len() && &s[ci..(ci + p.chars.len())] == p.chars {
-                // write alias to byte string
+                // mark alias position in byte string
                 let mut a_idx = 0;
                 for c in p.alias.as_ref().unwrap().as_bytes() {
                     s[ci + a_idx] = *c;
@@ -80,7 +77,48 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
             ci += 1;
         }
     }
+
+    let mut header_test = String::new();
+    for a in &aliases {
+        header_test.push_str(&String::from_utf8(a.chars.to_owned()).unwrap());
+        header_test.push_str(&a.alias);
+    }
+    println!("Un-compressed header ({} bytes): {}", header_test.len(), header_test);
+
+    // push aliases to string, shortest first (allowing smaller aliases to be used within the header)
+    let mut compressed = String::new();
+    let mut written_aliases = Vec::<AliasEntry>::new();
+    aliases.sort_by(|a, b| { b.chars.len().cmp(&a.chars.len()) });
+    while let Some(mut alias) = aliases.pop()  {
+        for wa in &written_aliases {
+            let mut ci = 0;
+            while ci < alias.chars.len() {
+                if ci + wa.chars.len() <= alias.chars.len() && &alias.chars[ci..(ci + wa.chars.len())] == wa.chars {
+                    println!("Replacing {:?} with {:?} for alias {}", String::from_utf8(wa.chars.to_owned()).unwrap(), wa.alias, alias.alias);
+                    let mut wa_idx = 0;
+                    for c in wa.alias.as_bytes() {
+                        alias.chars[ci + wa_idx] = *c;
+                        wa_idx += 1;
+                    }
+                    for pi in wa_idx..wa.chars.len() {
+                        alias.chars[ci + pi] = null_char as u8;
+                    }
+                }
+                ci += 1;
+            }
+        }
+        for c in &alias.chars {
+            if *c != null_char as u8 {
+                compressed.push(*c as char);
+            }
+        }
+        compressed.push_str(&alias.alias);
+        written_aliases.push(alias);
+    }
+    println!("Compressed header ({} bytes): {}", compressed.len(), compressed);
     compressed.push(header_term);
+
+    // push remaining bytes to string
     for c in s {
         if c != null_char as u8 {
             compressed.push(c as char);
@@ -125,6 +163,11 @@ fn print_patterns(patterns: &Vec<Pattern>, alias_len: usize) {
             p.savings(alias_len)
         );
     }
+}
+
+struct AliasEntry {
+    chars: Vec<u8>,
+    alias: String,
 }
 
 struct Pattern {

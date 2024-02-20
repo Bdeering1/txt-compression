@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::fs;
 
-mod compress;
-mod decompress;
+pub mod compress;
+pub mod decompress;
 
 const COMPRESSED_EXT: &str = "zt";
 const DECOMPRESSED_EXT: &str = "txt";

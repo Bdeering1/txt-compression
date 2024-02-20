@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
+pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<String, String> {
     let alias_len = 1;
 
     let mut alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
@@ -39,11 +39,14 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
         if p.savings(alias_len) <= 0 {
             continue;
         }
-        println!("Replacing {:?} count: {} savings: {}",
-            String::from_utf8(p.chars.to_owned()).unwrap(),
-            p.count,
-            p.savings(alias_len)
-        );
+
+        if verbose {
+            println!("Replacing {:?} count: {} savings: {}",
+                String::from_utf8(p.chars.to_owned()).unwrap(),
+                p.count,
+                p.savings(alias_len)
+            );
+        }
 
         // assign alias
         if p.alias.is_none() {
@@ -83,7 +86,6 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
         header_test.push_str(&String::from_utf8(a.chars.to_owned()).unwrap());
         header_test.push_str(&a.alias);
     }
-    println!("Un-compressed header ({} bytes): {}", header_test.len(), header_test);
 
     // push aliases to string, shortest first (allowing smaller aliases to be used within the header)
     let mut compressed = String::new();
@@ -94,7 +96,6 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
             let mut ci = 0;
             while ci < alias.chars.len() {
                 if ci + wa.chars.len() <= alias.chars.len() && &alias.chars[ci..(ci + wa.chars.len())] == wa.chars {
-                    println!("Replacing {:?} with {:?} for alias {}", String::from_utf8(wa.chars.to_owned()).unwrap(), wa.alias, alias.alias);
                     let mut wa_idx = 0;
                     for c in wa.alias.as_bytes() {
                         alias.chars[ci + wa_idx] = *c;
@@ -115,7 +116,6 @@ pub fn compress(mut s: Vec<u8>, _verbose: bool) -> Result<String, String> {
         compressed.push_str(&alias.alias);
         written_aliases.push(alias);
     }
-    println!("Compressed header ({} bytes): {}", compressed.len(), compressed);
     compressed.push(header_term);
 
     // push remaining bytes to string
@@ -153,16 +153,6 @@ fn find_patterns(s: &Vec<u8>, alias_len: usize) -> Vec<Pattern> {
     }
 
     return patterns;
-}
-
-fn print_patterns(patterns: &Vec<Pattern>, alias_len: usize) {
-    for p in patterns {
-        println!("found {:?} {} times ({} bytes reducable)",
-            String::from_utf8(p.chars.to_vec()).unwrap(),
-            p.count,
-            p.savings(alias_len)
-        );
-    }
 }
 
 struct AliasEntry {

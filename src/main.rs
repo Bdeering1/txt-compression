@@ -1,12 +1,8 @@
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::str;
+use std::path::Path;
 
-mod compress;
-mod decompress;
-
-const EXTENSION: &str = "zt";
+use ztext::{compress_file, decompress_file};
 
 fn main() {
     let args: Vec<String> = env::args().collect(); 
@@ -39,51 +35,14 @@ fn main() {
         }
     };
 
-    let output_str: String;
-    let mut output_file = PathBuf::from(input_file.file_name().unwrap());
+    let file_stem = input_file.file_stem().unwrap().to_str().unwrap();
     if compress {
-        output_str = match compress::compress(input.clone(), verbose) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("Compression failed: {}", e);
-                return;
-            }
-        };
-        output_file.set_extension(EXTENSION);
-        compress_summary(str::from_utf8(&input).unwrap(), &output_str, verbose);
+        if let Err(e) = compress_file(input, file_stem, None, verbose) {
+            println!("{}", e);
+        }
     } else {
-        output_str = match decompress::decompress(input.clone(), verbose) {
-            Ok(s) => s, 
-            Err(e) => {
-                println!("Decompression failed: {}", e);
-                return;
-            }
-        };
-        output_file.set_extension("txt");
-        decompress_summary(str::from_utf8(&input).unwrap(), &output_str, verbose);
+        if let Err(e) = decompress_file(input, file_stem, None, verbose) {
+            println!("{}", e);
+        }
     }
-
-    match fs::write(&output_file, output_str) {
-        Ok(_) => println!("Output written to {}", output_file.to_str().unwrap()),
-        Err(e) => println!("Error: {}", e),
-    }
-}
-
-fn compress_summary(is: &str, os: &str, verbose: bool) {
-    if verbose {
-        println!("Original: {}", is);
-        println!("Compressed: {}\n", os);
-    }
-    println!("Original size: {} bytes", is.len());
-    println!("Compressed size: {} bytes", os.len());
-    println!("Compression ratio: {:.2}%", (os.len() as f64 / is.len() as f64) * 100.0);
-}
-
-fn decompress_summary(is: &str, os: &str, verbose: bool) {
-    if verbose {
-        println!("Original: {}", is);
-        println!("Decompressed: {}\n", os);
-    }
-    println!("Original size: {} bytes", is.len());
-    println!("Decompressed size: {} bytes", os.len());
 }

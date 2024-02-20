@@ -1,4 +1,12 @@
 [package]
-name = "txt-compression"
+name = "ztext"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "ztext"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zt"
+path = "src/main.rs"

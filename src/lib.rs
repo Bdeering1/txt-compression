@@ -9,7 +9,7 @@ const DECOMPRESSED_EXT: &str = "txt";
 
 pub fn compress_file(bytes: Vec<u8>, file_stem: &str, extension: Option<&str>, verbose: bool) -> Result<(), String> {
     let input_len = bytes.len();
-    let output_str = match compress::compress(bytes, verbose) {
+    let output_bytes = match compress::compress(bytes, verbose) {
         Ok(s) => s,
         Err(e) => {
             return Err(format!("Compression failed: {}", e))
@@ -21,20 +21,20 @@ pub fn compress_file(bytes: Vec<u8>, file_stem: &str, extension: Option<&str>, v
     } else {
         output_file.set_extension(COMPRESSED_EXT);
     }
-    match write_output(&output_file, &output_str) {
+    match write_output(&output_file, &output_bytes) {
         Ok(s) => println!("{}", s),
         Err(e) => return Err(e),
     }
 
     println!("Original size: {} bytes", input_len);
-    println!("Compressed size: {} bytes", output_str.len());
-    println!("Compression ratio: {:.2}%", (output_str.len() as f64 / input_len as f64) * 100.0);
+    println!("Compressed size: {} bytes", output_bytes.len());
+    println!("Compression ratio: {:.2}%", (output_bytes.len() as f64 / input_len as f64) * 100.0);
     Ok(())
 }
 
 pub fn decompress_file(bytes: Vec<u8>, file_stem: &str, extension: Option<&str>, verbose: bool) -> Result<(), String> {
     let input_len = bytes.len();
-    let output_str = match decompress::decompress(bytes, verbose) {
+    let output_bytes = match decompress::decompress(bytes, verbose) {
         Ok(s) => s, 
         Err(e) => {
             return Err(format!("Decompression failed: {}", e))
@@ -46,18 +46,18 @@ pub fn decompress_file(bytes: Vec<u8>, file_stem: &str, extension: Option<&str>,
     } else {
         output_file.set_extension(DECOMPRESSED_EXT);
     }
-    match write_output(&output_file, &output_str) {
+    match write_output(&output_file, &output_bytes) {
         Ok(s) => println!("{}", s),
         Err(e) => return Err(e),
     }
 
     println!("Original size: {} bytes", input_len);
-    println!("Decompressed size: {} bytes", output_str.len());
+    println!("Decompressed size: {} bytes", output_bytes.len());
     Ok(())
 }
 
-fn write_output(output_file: &PathBuf, output_str: &str) -> Result<String, String> {
-    match fs::write(&output_file, output_str) {
+fn write_output(output_file: &PathBuf, output_bytes: &Vec<u8>) -> Result<String, String> {
+    match fs::write(&output_file, output_bytes) {
         Ok(_) => Ok(format!("Output written to {}", output_file.to_str().unwrap())),
         Err(e) => Err(format!("Failed to write output: {}", e)),
     }

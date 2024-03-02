@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
-pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<String, String> {
+pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
     let alias_len = 1;
 
-    let mut alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
-    let header_term = '|';
-    let null_char = '\0';
+    let mut alias_bytes = find_alias_bytes(&s)
+        .iter()
+        .map(|b| vec![*b])
+        .collect::<Vec<Vec<u8>>>();
+    let null_char = '\u{00}' as u8;
 
     let mut patterns = find_patterns(&s, alias_len);
     patterns.sort_by(|a, b| {
@@ -19,22 +21,22 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<String, String> {
     }
 
     let mut aliases = Vec::<AliasEntry>::new();
-    let mut ci;
+    let mut bi;
     loop {
-        // get sequence with most savings
+        // get next longest sequence with positive savings
         let mut p = match patterns.pop() {
             Some(p) => p,
             None => break
         };
         p.count = 0;
-        ci = 0;
-        while ci < s.len() {
-            if ci + p.chars.len() <= s.len() && &s[ci..(ci + p.chars.len())] == p.chars {
+        bi = 0;
+        while bi < s.len() {
+            if bi + p.chars.len() <= s.len() && &s[bi..(bi + p.chars.len())] == p.chars {
                 p.count += 1;
-                ci += p.chars.len();
+                bi += p.chars.len();
                 continue;
             }
-            ci += 1;
+            bi += 1;
         }
         if p.savings(alias_len) <= 0 {
             continue;
@@ -49,79 +51,78 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<String, String> {
         }
 
         // assign alias
-        if p.alias.is_none() {
-            p.alias = match alias_chars.pop() {
-                Some(seq) => Some(seq.to_owned()),
-                None => break
-            };
-            aliases.push(AliasEntry {
-                chars: p.chars.to_owned(),
-                alias: p.alias.as_ref().unwrap().to_owned()
-            });
-        }
+        let alias = alias_bytes.pop();
+        let alias = match alias {
+            Some(a) => a,
+            None => break
+        };
+        aliases.push(AliasEntry {
+            bytes: p.chars.to_owned(),
+            alias: alias.clone()
+        });
 
         // replace all instances with alias
-        ci = 0;
-        while ci < s.len() {
-            if ci + p.chars.len() <= s.len() && &s[ci..(ci + p.chars.len())] == p.chars {
+        bi = 0;
+        while bi < s.len() {
+            if bi + p.chars.len() <= s.len() && &s[bi..(bi + p.chars.len())] == p.chars {
                 // mark alias position in byte string
                 let mut a_idx = 0;
-                for c in p.alias.as_ref().unwrap().as_bytes() {
-                    s[ci + a_idx] = *c;
+                for b in &alias {
+                    s[bi + a_idx] = *b;
                     a_idx += 1;
                 }
                 // replace remaining chars with null char
                 for pi in a_idx..p.chars.len() {
-                    s[ci + pi] = null_char as u8;
+                    s[bi + pi] = null_char;
                 }
-                ci += p.chars.len();
+                bi += p.chars.len();
                 continue;
             }
-            ci += 1;
+            bi += 1;
         }
-    }
-
-    let mut header_test = String::new();
-    for a in &aliases {
-        header_test.push_str(&String::from_utf8(a.chars.to_owned()).unwrap());
-        header_test.push_str(&a.alias);
     }
 
     // push aliases to string, shortest first (allowing smaller aliases to be used within the header)
-    let mut compressed = String::new();
+    let mut compressed = Vec::<u8>::new();
     let mut written_aliases = Vec::<AliasEntry>::new();
-    aliases.sort_by(|a, b| { b.chars.len().cmp(&a.chars.len()) });
-    while let Some(mut alias) = aliases.pop()  {
+    aliases.sort_by(|a, b| { b.bytes.len().cmp(&a.bytes.len()) });
+    while let Some(mut a) = aliases.pop()  {
         for wa in &written_aliases {
-            let mut ci = 0;
-            while ci < alias.chars.len() {
-                if ci + wa.chars.len() <= alias.chars.len() && &alias.chars[ci..(ci + wa.chars.len())] == wa.chars {
+            let mut bi = 0;
+            while bi < a.bytes.len() {
+                if bi + wa.bytes.len() <= a.bytes.len() && &a.bytes[bi..(bi + wa.bytes.len())] == wa.bytes {
                     let mut wa_idx = 0;
-                    for c in wa.alias.as_bytes() {
-                        alias.chars[ci + wa_idx] = *c;
+                    for b in &wa.alias {
+                        a.bytes[bi + wa_idx] = *b;
                         wa_idx += 1;
                     }
-                    for pi in wa_idx..wa.chars.len() {
-                        alias.chars[ci + pi] = null_char as u8;
+                    for i in wa_idx..wa.bytes.len() {
+                        a.bytes[bi + i] = null_char;
                     }
                 }
-                ci += 1;
+                bi += 1;
             }
         }
-        for c in &alias.chars {
-            if *c != null_char as u8 {
-                compressed.push(*c as char);
+        // write aliased sequence
+        for b in &a.bytes {
+            if *b != null_char {
+                compressed.push(*b);
             }
         }
-        compressed.push_str(&alias.alias);
-        written_aliases.push(alias);
+        // write alias
+        for b in &a.alias {
+            if *b != null_char {
+                compressed.push(*b);
+            }
+        }
+        written_aliases.push(a);
     }
-    compressed.push(header_term);
+    compressed.push(null_char); // header term
 
     // push remaining bytes to string
-    for c in s {
-        if c != null_char as u8 {
-            compressed.push(c as char);
+    for b in s {
+        if b != null_char {
+            compressed.push(b);
         }
     }
 
@@ -156,14 +157,13 @@ fn find_patterns(s: &Vec<u8>, alias_len: usize) -> Vec<Pattern> {
 }
 
 struct AliasEntry {
-    chars: Vec<u8>,
-    alias: String,
+    bytes: Vec<u8>,
+    alias: Vec<u8>,
 }
 
 struct Pattern {
     chars: Vec<u8>,
     count: usize,
-    alias: Option<String>
 } 
 
 impl Pattern {
@@ -171,7 +171,6 @@ impl Pattern {
         Pattern {
             chars,
             count,
-            alias: None
         }
     }
 
@@ -181,4 +180,26 @@ impl Pattern {
         let alias_len = alias_len as i32;
         len * reps - (reps + 1) * alias_len - len
     }
+}
+
+fn find_alias_bytes(s: &Vec<u8>) -> Vec<u8> {
+    let mut used_bytes = vec![false; 256];
+    for c in s {
+        used_bytes[*c as usize] = true;
+    }
+
+    let mut available_bytes = Vec::<u8>::new();
+    for i in (1..32 /*256*/).rev() { // up to 256 can be used if bytes 32+ are specified in header
+        if !used_bytes[i] {
+            available_bytes.push(i as u8);
+        } 
+    }
+
+    // print!("Available alias bytes: ");
+    // for ab in &available_bytes {
+    //     print!("{:?}, ", ab);
+    // }
+    // println!();
+
+    return available_bytes;
 }

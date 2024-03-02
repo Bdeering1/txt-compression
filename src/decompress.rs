@@ -1,54 +1,58 @@
 use std::collections::HashMap;
-use std::str;
 
-pub fn decompress(s: Vec<u8>, _verbose: bool) -> Result<String, String> {
+pub fn decompress(s: Vec<u8>, _verbose: bool) -> Result<Vec<u8>, String> {
     let alias_len = 1;
-    let alias_chars = vec!["{", "}", "[", "]", "(", ")", "~", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "@", "#", "$", "%", "^", "&", "*", "_", "+", "="];
-    let header_term = '|';
+    let mut alias_bytes = Vec::<Vec<u8>>::new();
+    for i in 1..32 {
+        alias_bytes.push(vec![i]);
+    } 
+    let header_term = '\u{00}' as u8;
 
     // construct alias map
     let mut alias_map = HashMap::<Vec<u8>, Vec<u8>>::new();
-    let mut ci = 0;
+    let mut bi = 0;
     let mut seq = Vec::<u8>::new();
-    while ci < s.len() && s[ci] != header_term as u8 {
-        let alias = &s[ci..(ci + alias_len)]; // potential alias
-        if alias_chars.contains(&str::from_utf8(alias).unwrap()) {
-            if alias_map.contains_key(alias) {
+    while bi < s.len() && s[bi] != header_term {
+        let p_alias = &s[bi..(bi + alias_len)].to_vec(); // potential alias
+        if alias_bytes.contains(&p_alias) {
+            if alias_map.contains_key(p_alias) {
                 // expand existing alias
-                seq.extend(alias_map.get(alias).unwrap());
+                seq.extend(alias_map.get(p_alias).unwrap());
             } else {
                 // add new alias
                 alias_map.insert(
-                    s[ci..(ci + alias_len)].to_owned(),
+                    s[bi..(bi + alias_len)].to_owned(),
                     seq.clone()
                 );
                 seq.clear();
             }
-            ci += alias_len;
+            bi += alias_len;
             continue;
         }
-        seq.push(s[ci]);
-        ci += 1;
+        seq.push(s[bi]);
+        bi += 1;
     }
-    if ci >= s.len() {
+    if bi >= s.len() {
         return Err("Header terminator not found".to_owned());
     }
-    ci += 1;
+    bi += 1;
+
+    println!("Alias map: {:?}", alias_map);
 
     // build output string using alias map
-    let mut decompressed = String::new();
-    while ci < s.len() {
-        let alias = &s[ci..(ci + alias_len)]; // potential alias
-        if alias_map.contains_key(alias) {
-            decompressed.push_str(&str::from_utf8(
-                alias_map.get(alias).unwrap()
-            ).unwrap());
-            ci += alias_len;
+    let mut decompressed = Vec::<u8>::new();
+    while bi < s.len() {
+        let p_alias = &s[bi..(bi + alias_len)]; // potential alias
+        if alias_map.contains_key(p_alias) {
+            decompressed.append(&mut (alias_map.get(p_alias).unwrap().to_owned()));
+            bi += alias_len;
             continue;
         }
-        decompressed.push(s[ci] as char);
-        ci += 1;
+        decompressed.push(s[bi]);
+        bi += 1;
     }
 
     Ok(decompressed)
 }
+
+

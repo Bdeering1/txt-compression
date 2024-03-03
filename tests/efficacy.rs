@@ -29,8 +29,8 @@ fn decompress_utf8() {
         }
     };
 
-    let compressed = compress(input.clone(), true).unwrap().into_bytes();
+    let compressed = compress(input.clone(), true).unwrap();
     let res = decompress(compressed, false);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), String::from_utf8(input).unwrap());
+    assert_eq!(res.unwrap(), input);
 }

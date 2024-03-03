@@ -7,7 +7,7 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
         .iter()
         .map(|b| vec![*b])
         .collect::<Vec<Vec<u8>>>();
-    let null_char = '\u{00}' as u8;
+    let null_byte = '\u{00}' as u8;
 
     let mut patterns = find_patterns(&s, alias_len);
     patterns.sort_by(|a, b| {
@@ -20,7 +20,7 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
         return Err("Unable to compress input.".to_string());
     }
 
-    let mut aliases = Vec::<AliasEntry>::new();
+    let mut alias_mappings = Vec::<AliasEntry>::new();
     let mut bi;
     loop {
         // get next longest sequence with positive savings
@@ -42,6 +42,17 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
             continue;
         }
 
+        // assign alias
+        let alias = alias_bytes.pop();
+        let alias = match alias {
+            Some(a) => a,
+            None => break
+        };
+        alias_mappings.push(AliasEntry {
+            bytes: p.chars.to_owned(),
+            alias: alias.clone()
+        });
+
         if verbose {
             println!("Replacing {:?} count: {} savings: {}",
                 String::from_utf8(p.chars.to_owned()).unwrap(),
@@ -49,17 +60,6 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
                 p.savings(alias_len)
             );
         }
-
-        // assign alias
-        let alias = alias_bytes.pop();
-        let alias = match alias {
-            Some(a) => a,
-            None => break
-        };
-        aliases.push(AliasEntry {
-            bytes: p.chars.to_owned(),
-            alias: alias.clone()
-        });
 
         // replace all instances with alias
         bi = 0;
@@ -73,7 +73,7 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
                 }
                 // replace remaining chars with null char
                 for pi in a_idx..p.chars.len() {
-                    s[bi + pi] = null_char;
+                    s[bi + pi] = null_byte;
                 }
                 bi += p.chars.len();
                 continue;
@@ -85,8 +85,8 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
     // push aliases to string, shortest first (allowing smaller aliases to be used within the header)
     let mut compressed = Vec::<u8>::new();
     let mut written_aliases = Vec::<AliasEntry>::new();
-    aliases.sort_by(|a, b| { b.bytes.len().cmp(&a.bytes.len()) });
-    while let Some(mut a) = aliases.pop()  {
+    alias_mappings.sort_by(|a, b| { b.bytes.len().cmp(&a.bytes.len()) });
+    while let Some(mut a) = alias_mappings.pop()  {
         for wa in &written_aliases {
             let mut bi = 0;
             while bi < a.bytes.len() {
@@ -97,7 +97,7 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
                         wa_idx += 1;
                     }
                     for i in wa_idx..wa.bytes.len() {
-                        a.bytes[bi + i] = null_char;
+                        a.bytes[bi + i] = null_byte;
                     }
                 }
                 bi += 1;
@@ -105,28 +105,31 @@ pub fn compress(mut s: Vec<u8>, verbose: bool) -> Result<Vec<u8>, String> {
         }
         // write aliased sequence
         for b in &a.bytes {
-            if *b != null_char {
+            if *b != null_byte {
                 compressed.push(*b);
             }
         }
         // write alias
         for b in &a.alias {
-            if *b != null_char {
+            if *b != null_byte {
                 compressed.push(*b);
             }
         }
         written_aliases.push(a);
     }
-    compressed.push(null_char); // header term
+    compressed.push(null_byte); // header term
 
     // push remaining bytes to string
-    for b in s {
-        if b != null_char {
-            compressed.push(b);
+    for b in &s {
+        if *b != null_byte {
+            compressed.push(*b);
         }
     }
+    if compressed.len() >= s.len() {
+        return Err("Unable to compress input.".to_string());
+    }
 
-    return Ok(compressed);
+    Ok(compressed)
 }
 
 fn find_patterns(s: &Vec<u8>, alias_len: usize) -> Vec<Pattern> {
@@ -153,7 +156,7 @@ fn find_patterns(s: &Vec<u8>, alias_len: usize) -> Vec<Pattern> {
         patterns.push(Pattern::new(k.to_owned(), *v));
     }
 
-    return patterns;
+    patterns
 }
 
 struct AliasEntry {
@@ -201,5 +204,5 @@ fn find_alias_bytes(s: &Vec<u8>) -> Vec<u8> {
     // }
     // println!();
 
-    return available_bytes;
+    available_bytes
 }
